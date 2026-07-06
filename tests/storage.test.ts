@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { IntegrityError } from "../src/lib/errors";
 import { newSlip } from "../src/lib/model";
-import { mutate, readSlips, withLock, writeSlips } from "../src/lib/storage";
+import { findRoot, mutate, readConfig, readSlips, withLock, writeSlips } from "../src/lib/storage";
 
 let root: string;
 beforeEach(() => {
@@ -73,4 +74,48 @@ test("withLock fails fast on a live lock", () => {
   const lockPath = join(root, ".slips", ".lock");
   writeFileSync(lockPath, JSON.stringify({ pid: 99999, at: new Date().toISOString() }));
   expect(() => withLock(root, () => 42, { retryMs: 100 })).toThrow(/lock/i);
+});
+
+test("withLock does not delete a lock it no longer owns", () => {
+  const lockPath = join(root, ".slips", ".lock");
+  const foreign = JSON.stringify({
+    pid: 99999,
+    at: new Date().toISOString(),
+    token: "someone-elses-token",
+  });
+  withLock(root, () => {
+    // Simulate another process reclaiming the lock while fn() runs.
+    writeFileSync(lockPath, foreign);
+  });
+  expect(existsSync(lockPath)).toBe(true);
+  expect(readFileSync(lockPath, "utf8")).toBe(foreign);
+});
+
+test("findRoot walks up from a nested subdirectory", () => {
+  const nested = join(root, "a", "b", "c");
+  mkdirSync(nested, { recursive: true });
+  expect(findRoot(nested)).toBe(root);
+});
+
+test("findRoot returns null when no .slips exists up the tree", () => {
+  const bare = mkdtempSync(join(tmpdir(), "slips-noroot-"));
+  try {
+    expect(findRoot(bare)).toBeNull();
+  } finally {
+    rmSync(bare, { recursive: true, force: true });
+  }
+});
+
+test("readConfig returns defaults when config.json is absent", () => {
+  expect(readConfig(root)).toEqual({ prefix: "sl", default_ttl: "60m" });
+});
+
+test("readConfig merges partial config over defaults", () => {
+  writeFileSync(join(root, ".slips", "config.json"), JSON.stringify({ prefix: "xy" }));
+  expect(readConfig(root)).toEqual({ prefix: "xy", default_ttl: "60m" });
+});
+
+test("readConfig throws IntegrityError on invalid JSON", () => {
+  writeFileSync(join(root, ".slips", "config.json"), "not json {{{");
+  expect(() => readConfig(root)).toThrow(IntegrityError);
 });

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
   closeSync,
   existsSync,
@@ -79,11 +80,12 @@ const LOCK_RETRY_MS = 3_000;
 export function withLock<T>(root: string, fn: () => T, opts?: { retryMs?: number }): T {
   const lockPath = join(root, ".slips", ".lock");
   const deadline = Date.now() + (opts?.retryMs ?? LOCK_RETRY_MS);
+  const token = randomUUID();
   let waitMs = 25;
   for (;;) {
     try {
       const fd = openSync(lockPath, "wx");
-      writeFileSync(fd, JSON.stringify({ pid: process.pid, at: new Date().toISOString() }));
+      writeFileSync(fd, JSON.stringify({ pid: process.pid, at: new Date().toISOString(), token }));
       closeSync(fd);
       break;
     } catch {
@@ -112,7 +114,14 @@ export function withLock<T>(root: string, fn: () => T, opts?: { retryMs?: number
   try {
     return fn();
   } finally {
-    rmSync(lockPath, { force: true });
+    // Only release the lock if we still own it — another process may have
+    // legitimately reclaimed it as stale while fn() was running.
+    try {
+      const info = JSON.parse(readFileSync(lockPath, "utf8"));
+      if (info.token === token) rmSync(lockPath, { force: true });
+    } catch {
+      // unreadable or missing lock — do not delete
+    }
   }
 }
 
