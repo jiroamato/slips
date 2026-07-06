@@ -22,8 +22,12 @@ export function run(argv: string[]): void {
     allowPositionals: true,
   });
   const id = positionals[0];
-  if (!id && !values.session && !values.agent) {
+  const selectorCount = [id, values.session, values.agent].filter(Boolean).length;
+  if (selectorCount === 0) {
     throw new UserError("usage: slip release <id> | --session <sid> | --agent <name>");
+  }
+  if (selectorCount > 1) {
+    throw new UserError("provide exactly one of <id>, --session, or --agent");
   }
   const root = requireRoot();
   const released = mutate(root, (slips) => {

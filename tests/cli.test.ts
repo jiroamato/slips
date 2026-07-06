@@ -232,6 +232,22 @@ test("release by id and by session reopens slips", () => {
   expect(s.claim).toBeNull();
 });
 
+test("release rejects combined selectors", () => {
+  const repo = makeRepo();
+  runSlip(repo, "init");
+  const a = runSlip(repo, "create", "--title", "A").out.trim();
+  const b = runSlip(repo, "create", "--title", "B").out.trim();
+  runSlip(repo, "claim", a, "--agent", "alice", "--session", "s1");
+  runSlip(repo, "claim", b, "--agent", "bob", "--session", "s2");
+  const r = runSlip(repo, "release", "--session", "s1", "--agent", "bob");
+  expect(r.code).toBe(1);
+  expect(r.err).toContain("exactly one");
+  const sa = JSON.parse(runSlip(repo, "show", a, "--json").out);
+  expect(sa.claim).not.toBeNull();
+  const sb = JSON.parse(runSlip(repo, "show", b, "--json").out);
+  expect(sb.claim).not.toBeNull();
+});
+
 test("ready lists open unblocked unclaimed work in priority order", () => {
   const repo = makeRepo();
   runSlip(repo, "init");

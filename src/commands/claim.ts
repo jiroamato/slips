@@ -31,13 +31,14 @@ export function run(argv: string[]): void {
         `${id} is claimed by "${s.claim.agent}" until ${s.claim.expires_at} — retry after expiry or ask them to release`,
       );
     }
+    const now = new Date();
     s.claim = {
       agent: values.agent as string,
       session_id: values.session ?? null,
-      expires_at: new Date(Date.now() + ttlMs).toISOString(),
+      expires_at: new Date(now.getTime() + ttlMs).toISOString(),
     };
     s.status = "in_progress";
-    s.updated_at = nowIso();
+    s.updated_at = nowIso(now);
     return s;
   });
   console.log(
