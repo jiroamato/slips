@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { makeRepo, runSlip } from "./helpers";
 
@@ -142,6 +142,48 @@ test("close sets closed_at, reason, clears claim", () => {
   expect(s.close_reason).toBe("fixed");
   expect(s.claim).toBeNull();
   expect(s.closed_at).not.toBeNull();
+});
+
+test("update --status closed clears claim", () => {
+  const repo = makeRepo();
+  runSlip(repo, "init");
+  const id = runSlip(repo, "create", "--title", "Claimed work").out.trim();
+  const slip = JSON.parse(runSlip(repo, "show", id, "--json").out);
+  slip.claim = {
+    agent: "x",
+    session_id: null,
+    expires_at: new Date(Date.now() + 3_600_000).toISOString(),
+  };
+  slip.updated_at = new Date(Date.now() + 1_000).toISOString();
+  appendFileSync(join(repo, ".slips", "issues.jsonl"), `${JSON.stringify(slip)}\n`);
+  runSlip(repo, "update", id, "--status", "closed");
+  const s = JSON.parse(runSlip(repo, "show", id, "--json").out);
+  expect(s.status).toBe("closed");
+  expect(s.claim).toBeNull();
+});
+
+test("re-close preserves closed_at and reason", () => {
+  const repo = makeRepo();
+  runSlip(repo, "init");
+  const id = runSlip(repo, "create", "--title", "Close twice").out.trim();
+  runSlip(repo, "close", id, "--reason", "first");
+  const first = JSON.parse(runSlip(repo, "show", id, "--json").out);
+  const r = runSlip(repo, "close", id);
+  expect(r.code).toBe(0);
+  const s = JSON.parse(runSlip(repo, "show", id, "--json").out);
+  expect(s.closed_at).toBe(first.closed_at);
+  expect(s.close_reason).toBe("first");
+});
+
+test("dep add is idempotent", () => {
+  const repo = makeRepo();
+  runSlip(repo, "init");
+  const a = runSlip(repo, "create", "--title", "A").out.trim();
+  const b = runSlip(repo, "create", "--title", "B").out.trim();
+  expect(runSlip(repo, "dep", "add", a, b).code).toBe(0);
+  expect(runSlip(repo, "dep", "add", a, b).code).toBe(0);
+  const s = JSON.parse(runSlip(repo, "show", a, "--json").out);
+  expect(s.blocked_by).toEqual([b]);
 });
 
 test("dep add/rm with cycle and unknown-id rejection", () => {

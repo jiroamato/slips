@@ -18,11 +18,16 @@ export function run(argv: string[]): void {
   const root = requireRoot();
   const closed = mutate(root, (slips) => {
     const s = findSlip(slips, id);
+    const wasClosed = s.status === "closed";
     s.status = "closed";
     s.claim = null;
-    s.closed_at = nowIso();
-    s.close_reason = values.reason ?? null;
-    s.updated_at = s.closed_at;
+    if (!wasClosed) s.closed_at = nowIso();
+    if (values.reason !== undefined) {
+      s.close_reason = values.reason;
+    } else if (!wasClosed) {
+      s.close_reason = null;
+    }
+    s.updated_at = nowIso();
     return s;
   });
   console.log(values.json ? JSON.stringify(closed) : `closed ${closed.id}`);

@@ -34,8 +34,9 @@ export function run(argv: string[]): void {
       if (status !== "closed") {
         s.closed_at = null;
         s.close_reason = null;
-      } else if (!s.closed_at) {
-        s.closed_at = nowIso();
+      } else {
+        s.claim = null;
+        if (!s.closed_at) s.closed_at = nowIso();
       }
     }
     for (const l of values["add-label"]) if (!s.labels.includes(l)) s.labels.push(l);
