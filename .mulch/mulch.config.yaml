@@ -2,6 +2,7 @@ version: '1'
 domains:
   architecture: {}
   conventions: {}
+  storage: {}
 governance:
   max_entries: 100
   warn_entries: 150
