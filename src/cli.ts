@@ -66,6 +66,15 @@ async function main(): Promise<void> {
   await command.run(rest);
 }
 
+function isUserError(err: unknown): boolean {
+  if (err instanceof UserError) return true;
+  if (err && typeof err === "object" && "code" in err) {
+    const code = (err as { code?: unknown }).code;
+    return typeof code === "string" && code.startsWith("ERR_PARSE_ARGS_");
+  }
+  return false;
+}
+
 main().catch((err: unknown) => {
   const message = err instanceof Error ? err.message : String(err);
   if (process.argv.includes("--json")) {
@@ -73,5 +82,5 @@ main().catch((err: unknown) => {
   } else {
     console.error(`slip: ${message}`);
   }
-  process.exit(err instanceof UserError ? 1 : 2);
+  process.exit(isUserError(err) ? 1 : 2);
 });

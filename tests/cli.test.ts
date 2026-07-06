@@ -33,6 +33,29 @@ test("init is idempotent — no duplicate blocks or attributes", () => {
   expect(agents.match(/<!-- slips:start -->/g)).toHaveLength(1);
 });
 
+test("init reports the existing effective prefix, not a re-requested one", () => {
+  const repo = makeRepo();
+  runSlip(repo, "init", "--prefix", "sl");
+  const r = runSlip(repo, "init", "--prefix", "zz");
+  expect(r.code).toBe(0);
+  expect(r.out).toContain("sl");
+  expect(r.out).not.toContain('"zz"');
+  const config = JSON.parse(readFileSync(join(repo, ".slips", "config.json"), "utf8"));
+  expect(config.prefix).toBe("sl");
+  const json = JSON.parse(runSlip(repo, "init", "--prefix", "zz", "--json").out);
+  expect(json.prefix).toBe("sl");
+});
+
+test("init adds .slips/.lock to .gitignore, idempotent on re-run", () => {
+  const repo = makeRepo();
+  runSlip(repo, "init");
+  const gitignore = readFileSync(join(repo, ".gitignore"), "utf8");
+  expect(gitignore).toContain(".slips/.lock");
+  runSlip(repo, "init");
+  const again = readFileSync(join(repo, ".gitignore"), "utf8");
+  expect(again.match(/\.slips\/\.lock/g)).toHaveLength(1);
+});
+
 test("init --claude writes SessionStart and SessionEnd hooks, preserving existing settings", () => {
   const repo = makeRepo();
   const settingsDir = join(repo, ".claude");
@@ -98,6 +121,23 @@ test("search matches title/description/labels/id case-insensitively", () => {
   expect(hits).toHaveLength(2);
   const byId = JSON.parse(runSlip(repo, "search", a, "--json").out);
   expect(byId).toHaveLength(1);
+});
+
+test("list prints a corrupt-line warning to stderr and still exits 0", () => {
+  const repo = makeRepo();
+  runSlip(repo, "init");
+  runSlip(repo, "create", "--title", "Valid");
+  appendFileSync(join(repo, ".slips", "issues.jsonl"), "corrupt line{{{\n");
+  const r = runSlip(repo, "list");
+  expect(r.code).toBe(0);
+  expect(r.err).toContain("corrupt");
+});
+
+test("bad flags exit 1, not 2", () => {
+  const repo = makeRepo();
+  runSlip(repo, "init");
+  const r = runSlip(repo, "list", "--bogus");
+  expect(r.code).toBe(1);
 });
 
 test("list filters and hides closed by default", () => {
@@ -310,4 +350,14 @@ test("doctor reports problems and --fix repairs the mechanical ones", () => {
   const clean = runSlip(repo, "doctor");
   expect(clean.code).toBe(0);
   expect(JSON.parse(runSlip(repo, "show", id, "--json").out).id).toBe(id); // survivor intact
+});
+
+test("doctor reports corrupt lines itself and suppresses the storage-layer warning", () => {
+  const repo = makeRepo();
+  runSlip(repo, "init");
+  runSlip(repo, "create", "--title", "Valid");
+  appendFileSync(join(repo, ".slips", "issues.jsonl"), "corrupt line{{{\n");
+  const r = runSlip(repo, "doctor");
+  expect(r.out + r.err).toContain("problem: corrupt line");
+  expect(r.out + r.err).not.toContain("slip: skipping");
 });

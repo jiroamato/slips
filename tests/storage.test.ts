@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, test } from "bun:test";
+import { afterEach, beforeEach, expect, spyOn, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -43,6 +43,31 @@ test("readSlips skips corrupt lines with a warning", () => {
   const { slips, warnings } = readSlips(root);
   expect(slips).toHaveLength(1);
   expect(warnings).toHaveLength(2);
+});
+
+test("readSlips prints corrupt-line warnings to stderr by default", () => {
+  const good = newSlip({ id: "sl-good", title: "ok" });
+  writeFileSync(issuesPath(), `garbage{{{\n${JSON.stringify(good)}\n`);
+  const spy = spyOn(console, "error").mockImplementation(() => {});
+  try {
+    readSlips(root);
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(String(spy.mock.calls[0]?.[0])).toContain("slip:");
+  } finally {
+    spy.mockRestore();
+  }
+});
+
+test("readSlips with { quiet: true } emits nothing to stderr", () => {
+  const good = newSlip({ id: "sl-good", title: "ok" });
+  writeFileSync(issuesPath(), `garbage{{{\n${JSON.stringify(good)}\n`);
+  const spy = spyOn(console, "error").mockImplementation(() => {});
+  try {
+    readSlips(root, { quiet: true });
+    expect(spy).not.toHaveBeenCalled();
+  } finally {
+    spy.mockRestore();
+  }
 });
 
 test("writeSlips + readSlips round trip; no temp files left", () => {

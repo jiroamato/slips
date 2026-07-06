@@ -45,7 +45,10 @@ export function readConfig(root: string): Config {
   }
 }
 
-export function readSlips(root: string): { slips: Slip[]; warnings: string[] } {
+export function readSlips(
+  root: string,
+  opts?: { quiet?: boolean },
+): { slips: Slip[]; warnings: string[] } {
   const path = join(root, ".slips", "issues.jsonl");
   if (!existsSync(path)) return { slips: [], warnings: [] };
   const warnings: string[] = [];
@@ -61,6 +64,9 @@ export function readSlips(root: string): { slips: Slip[]; warnings: string[] } {
     }
     const prev = byId.get(slip.id);
     if (!prev || slip.updated_at >= prev.updated_at) byId.set(slip.id, slip);
+  }
+  if (!opts?.quiet) {
+    for (const w of warnings) console.error(`slip: ${w}`);
   }
   return { slips: [...byId.values()], warnings };
 }

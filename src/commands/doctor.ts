@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { IntegrityError } from "../lib/errors";
@@ -33,7 +33,7 @@ export function run(argv: string[]): void {
   }
   for (const [id, n] of seen) if (n > 1) fixable.push(`duplicate id ${id} (${n} lines)`);
 
-  const { slips } = readSlips(root);
+  const { slips } = readSlips(root, { quiet: true });
   const ids = new Set(slips.map((s) => s.id));
   for (const s of slips) {
     for (const dep of s.blocked_by) {
@@ -64,12 +64,11 @@ export function run(argv: string[]): void {
 
   if (values.fix && fixable.length > 0) {
     withLock(root, () => {
-      const cleaned = readSlips(root).slips.map((s) =>
+      const cleaned = readSlips(root, { quiet: true }).slips.map((s) =>
         s.claim && !isLiveClaim(s.claim) ? { ...s, claim: null, updated_at: nowIso() } : s,
       );
       writeSlips(root, cleaned); // rewrite compacts dups and drops corrupt lines
     });
-    if (fixable.some((f) => f.includes("lock"))) rmSync(lockPath, { force: true });
   }
 
   const remaining = values.fix ? problems : [...fixable, ...problems];

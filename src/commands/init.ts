@@ -57,16 +57,27 @@ export function run(argv: string[]): void {
   const dir = join(root, ".slips");
   mkdirSync(dir, { recursive: true });
   const configPath = join(dir, "config.json");
-  if (!existsSync(configPath)) {
+  const configExisted = existsSync(configPath);
+  let effectivePrefix = values.prefix;
+  if (!configExisted) {
     writeFileSync(
       configPath,
       `${JSON.stringify({ prefix: values.prefix, default_ttl: "60m" }, null, 2)}\n`,
     );
+  } else {
+    try {
+      const existingConfig = JSON.parse(readFileSync(configPath, "utf8"));
+      if (typeof existingConfig.prefix === "string") effectivePrefix = existingConfig.prefix;
+    } catch {
+      // existing config is unreadable — fall back to the requested prefix
+    }
   }
+  const prefixKept = configExisted && values.prefix !== effectivePrefix;
   const issuesPath = join(dir, "issues.jsonl");
   if (!existsSync(issuesPath)) writeFileSync(issuesPath, "");
 
   ensureLine(join(root, ".gitattributes"), GITATTR_LINE);
+  ensureLine(join(root, ".gitignore"), ".slips/.lock");
   ensureBlock(join(root, "AGENTS.md"), ONBOARDING);
   ensureBlock(join(root, "CLAUDE.md"), ONBOARDING);
 
@@ -86,13 +97,14 @@ export function run(argv: string[]): void {
     console.log(
       JSON.stringify({
         initialized: true,
-        prefix: values.prefix,
+        prefix: effectivePrefix,
         claude: values.claude,
       }),
     );
   } else {
+    const prefixNote = prefixKept ? " (existing config kept)" : "";
     console.log(
-      `initialized .slips (prefix "${values.prefix}")${values.claude ? " with Claude Code hooks" : ""}`,
+      `initialized .slips (prefix "${effectivePrefix}"${prefixNote})${values.claude ? " with Claude Code hooks" : ""}`,
     );
   }
 }
