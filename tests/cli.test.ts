@@ -262,3 +262,52 @@ test("ready lists open unblocked unclaimed work in priority order", () => {
   const after = JSON.parse(runSlip(repo, "ready", "--json").out);
   expect(after.map((s: { id: string }) => s.id)).toContain(blocked);
 });
+
+test("prime renders sections and respects --budget", () => {
+  const repo = makeRepo();
+  runSlip(repo, "init");
+  runSlip(repo, "create", "--title", "Ready work", "--priority", "1");
+  const wip = runSlip(repo, "create", "--title", "Working").out.trim();
+  runSlip(repo, "claim", wip, "--agent", "alice");
+  const done = runSlip(repo, "create", "--title", "Finished").out.trim();
+  runSlip(repo, "close", done, "--reason", "shipped");
+  const full = runSlip(repo, "prime");
+  expect(full.code).toBe(0);
+  expect(full.out).toContain("Ready");
+  expect(full.out).toContain("alice");
+  expect(full.out).toContain("Finished");
+  const tiny = runSlip(repo, "prime", "--budget", "40");
+  expect(tiny.out).toContain("Ready work");
+  expect(tiny.out).not.toContain("Finished");
+});
+
+test("sync commits only .slips changes; clean tree is a no-op", () => {
+  const repo = makeRepo();
+  Bun.spawnSync(["git", "config", "user.email", "t@t"], { cwd: repo });
+  Bun.spawnSync(["git", "config", "user.name", "t"], { cwd: repo });
+  runSlip(repo, "init");
+  runSlip(repo, "create", "--title", "Tracked");
+  const r = runSlip(repo, "sync", "-m", "chore: sync slips");
+  expect(r.code).toBe(0);
+  const log = Bun.spawnSync(["git", "log", "--oneline"], { cwd: repo }).stdout.toString();
+  expect(log).toContain("chore: sync slips");
+  const again = runSlip(repo, "sync");
+  expect(again.code).toBe(0);
+  expect(again.out).toContain("nothing to sync");
+});
+
+test("doctor reports problems and --fix repairs the mechanical ones", () => {
+  const repo = makeRepo();
+  runSlip(repo, "init");
+  const id = runSlip(repo, "create", "--title", "Valid").out.trim();
+  const issues = join(repo, ".slips", "issues.jsonl");
+  appendFileSync(issues, "corrupt line{{{\n");
+  const r = runSlip(repo, "doctor");
+  expect(r.code).toBe(2);
+  expect(r.out + r.err).toContain("corrupt");
+  const fix = runSlip(repo, "doctor", "--fix");
+  expect(fix.code).toBe(0);
+  const clean = runSlip(repo, "doctor");
+  expect(clean.code).toBe(0);
+  expect(JSON.parse(runSlip(repo, "show", id, "--json").out).id).toBe(id); // survivor intact
+});

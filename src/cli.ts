@@ -3,12 +3,15 @@ import * as claim from "./commands/claim";
 import * as close from "./commands/close";
 import * as create from "./commands/create";
 import * as dep from "./commands/dep";
+import * as doctor from "./commands/doctor";
 import * as init from "./commands/init";
 import * as list from "./commands/list";
+import * as prime from "./commands/prime";
 import * as ready from "./commands/ready";
 import * as release from "./commands/release";
 import * as search from "./commands/search";
 import * as show from "./commands/show";
+import * as sync from "./commands/sync";
 import * as update from "./commands/update";
 import { UserError } from "./lib/errors";
 
@@ -26,6 +29,9 @@ const registry: Record<string, Command> = {
   claim,
   release,
   ready,
+  prime,
+  sync,
+  doctor,
 };
 
 const HELP = `slip — git-native issue tracker for agents
