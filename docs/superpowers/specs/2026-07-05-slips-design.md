@@ -5,7 +5,7 @@
 
 ## Overview
 
-Slips is a lightweight, git-native issue tracker built for AI agent workflows. It is inspired by [seeds](https://github.com/jayminwest/seeds) but deliberately smaller: the minimal core (issues, dependencies, ready-work detection) done better, with two differentiators aimed squarely at agents — a token-budgeted `prime` command for context injection, and lease-based claims so parallel agents never silently grab the same work.
+Slips is a lightweight, git-native issue tracker built for AI agent workflows: the minimal core of issue tracking (issues, dependencies, ready-work detection) with two differentiators aimed squarely at agents — a token-budgeted `prime` command for context injection, and lease-based claims so parallel agents never silently grab the same work.
 
 No database daemon, no binary files, no runtime dependencies. The JSONL file is the database; git is the sync layer.
 
@@ -18,7 +18,7 @@ No database daemon, no binary files, no runtime dependencies. The JSONL file is 
 
 ## Non-Goals (v1)
 
-- Plans / decomposition (seeds' plan surface), templates/convoys, extensions metadata.
+- Plan/decomposition surfaces, issue templates, or extensions metadata.
 - Event sourcing or audit history — state-based storage only.
 - Markdown bodies or any human-facing storage format. Slips is for agents to read.
 - Enforcement hooks that block agent behavior.
@@ -155,11 +155,11 @@ The repo also gets `.mulch/` (via `ml init`) as its memory system, and is publis
 
 **Commits:** Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`; `!` or `BREAKING CHANGE:` for majors). Semver derives from them: `fix` → patch, `feat` → minor, breaking → major.
 
-**Releases:** `release-please` GitHub Action watches `main`, maintains a running release PR with the version bump and generated `CHANGELOG.md`, and tags on merge.
+**Releases:** `release-please` GitHub Action watches `main`, maintains a running release PR with the version bump and generated `CHANGELOG.md`, and tags on merge; a publish job gated on `release_created` runs `npm publish --provenance`.
 
-**CI (GitHub Actions):** on every PR — `bun test`, Biome check, `tsc --noEmit`, PR title lint.
+**CI (GitHub Actions):** on every PR and push to `main`/`dev` — `bun test` on a three-OS matrix (ubuntu/macos/windows; the lock and atomic-rename code is platform-sensitive) with junit + lcov artifacts, Biome check, `tsc --noEmit`, PR title lint. Dependabot (weekly, targeting `dev`) keeps actions and dev-dependencies fresh; minor/patch dependabot PRs auto-merge once checks pass.
 
-**Branch protection:** `main` and `dev` accept PRs only (no direct pushes, no force pushes), required status checks: test, lint, typecheck.
+**Branch protection:** `main` and `dev` accept PRs only (no direct pushes, no force pushes), required status checks: the three test matrix jobs, lint, typecheck.
 
 ## Error Handling
 
