@@ -352,6 +352,20 @@ test("doctor reports problems and --fix repairs the mechanical ones", () => {
   expect(JSON.parse(runSlip(repo, "show", id, "--json").out).id).toBe(id); // survivor intact
 });
 
+test("doctor flags a lock with unparseable timestamp", () => {
+  const repo = makeRepo();
+  runSlip(repo, "init");
+  const lockPath = join(repo, ".slips", ".lock");
+  writeFileSync(lockPath, JSON.stringify({ pid: 12345 }));
+  const r = runSlip(repo, "doctor");
+  expect(r.code).toBe(2);
+  expect(r.out + r.err).toContain("lock");
+  const fix = runSlip(repo, "doctor", "--fix");
+  expect(fix.code).toBe(0);
+  const clean = runSlip(repo, "doctor");
+  expect(clean.code).toBe(0);
+});
+
 test("doctor reports corrupt lines itself and suppresses the storage-layer warning", () => {
   const repo = makeRepo();
   runSlip(repo, "init");

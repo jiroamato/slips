@@ -100,7 +100,8 @@ export function withLock<T>(root: string, fn: () => T, opts?: { retryMs?: number
       try {
         const info = JSON.parse(readFileSync(lockPath, "utf8"));
         holder = String(info.pid ?? "unknown");
-        stale = Date.now() - Date.parse(info.at) > LOCK_STALE_MS;
+        const age = Date.now() - Date.parse(info.at);
+        stale = Number.isNaN(age) || age > LOCK_STALE_MS;
       } catch {
         stale = true; // unreadable/corrupt lock — reclaim
       }

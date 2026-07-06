@@ -101,6 +101,12 @@ test("withLock fails fast on a live lock", () => {
   expect(() => withLock(root, () => 42, { retryMs: 100 })).toThrow(/lock/i);
 });
 
+test("withLock reclaims a lock with unparseable timestamp", () => {
+  const lockPath = join(root, ".slips", ".lock");
+  writeFileSync(lockPath, JSON.stringify({ pid: 12345 }));
+  expect(withLock(root, () => 42, { retryMs: 200 })).toBe(42);
+});
+
 test("withLock does not delete a lock it no longer owns", () => {
   const lockPath = join(root, ".slips", ".lock");
   const foreign = JSON.stringify({

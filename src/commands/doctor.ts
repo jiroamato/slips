@@ -56,7 +56,8 @@ export function run(argv: string[]): void {
   if (existsSync(lockPath)) {
     try {
       const info = JSON.parse(readFileSync(lockPath, "utf8"));
-      if (Date.now() - Date.parse(info.at) > 30_000) fixable.push("stale lock file");
+      const age = Date.now() - Date.parse(info.at);
+      if (Number.isNaN(age) || age > 30_000) fixable.push("stale lock file");
     } catch {
       fixable.push("unreadable lock file");
     }
