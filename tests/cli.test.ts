@@ -99,3 +99,60 @@ test("search matches title/description/labels/id case-insensitively", () => {
   const byId = JSON.parse(runSlip(repo, "search", a, "--json").out);
   expect(byId).toHaveLength(1);
 });
+
+test("list filters and hides closed by default", () => {
+  const repo = makeRepo();
+  runSlip(repo, "init");
+  const a = runSlip(repo, "create", "--title", "Open task").out.trim();
+  const b = runSlip(repo, "create", "--title", "A bug", "--type", "bug").out.trim();
+  runSlip(repo, "close", b);
+  const open = JSON.parse(runSlip(repo, "list", "--json").out);
+  expect(open.map((s: { id: string }) => s.id)).toEqual([a]);
+  const all = JSON.parse(runSlip(repo, "list", "--all", "--json").out);
+  expect(all).toHaveLength(2);
+  const bugs = JSON.parse(runSlip(repo, "list", "--all", "--type", "bug", "--json").out);
+  expect(bugs.map((s: { id: string }) => s.id)).toEqual([b]);
+});
+
+test("update edits fields; reopen clears closed metadata", () => {
+  const repo = makeRepo();
+  runSlip(repo, "init");
+  const id = runSlip(repo, "create", "--title", "Original").out.trim();
+  runSlip(repo, "update", id, "--title", "Renamed", "--priority", "0", "--add-label", "hot");
+  let s = JSON.parse(runSlip(repo, "show", id, "--json").out);
+  expect(s.title).toBe("Renamed");
+  expect(s.priority).toBe(0);
+  expect(s.labels).toEqual(["hot"]);
+  runSlip(repo, "close", id, "--reason", "done");
+  runSlip(repo, "update", id, "--status", "open");
+  s = JSON.parse(runSlip(repo, "show", id, "--json").out);
+  expect(s.status).toBe("open");
+  expect(s.closed_at).toBeNull();
+  expect(s.close_reason).toBeNull();
+});
+
+test("close sets closed_at, reason, clears claim", () => {
+  const repo = makeRepo();
+  runSlip(repo, "init");
+  const id = runSlip(repo, "create", "--title", "To close").out.trim();
+  const r = runSlip(repo, "close", id, "--reason", "fixed");
+  expect(r.code).toBe(0);
+  const s = JSON.parse(runSlip(repo, "show", id, "--json").out);
+  expect(s.status).toBe("closed");
+  expect(s.close_reason).toBe("fixed");
+  expect(s.claim).toBeNull();
+  expect(s.closed_at).not.toBeNull();
+});
+
+test("dep add/rm with cycle and unknown-id rejection", () => {
+  const repo = makeRepo();
+  runSlip(repo, "init");
+  const a = runSlip(repo, "create", "--title", "A").out.trim();
+  const b = runSlip(repo, "create", "--title", "B").out.trim();
+  expect(runSlip(repo, "dep", "add", a, b).code).toBe(0);
+  expect(runSlip(repo, "dep", "add", b, a).code).toBe(1); // cycle
+  expect(runSlip(repo, "dep", "add", a, "sl-nope").code).toBe(1); // unknown
+  expect(runSlip(repo, "dep", "rm", a, b).code).toBe(0);
+  const s = JSON.parse(runSlip(repo, "show", a, "--json").out);
+  expect(s.blocked_by).toEqual([]);
+});

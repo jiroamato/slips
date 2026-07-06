@@ -1,9 +1,12 @@
 #!/usr/bin/env bun
+import * as close from "./commands/close";
 import * as create from "./commands/create";
+import * as dep from "./commands/dep";
 import * as init from "./commands/init";
 import * as list from "./commands/list";
 import * as search from "./commands/search";
 import * as show from "./commands/show";
+import * as update from "./commands/update";
 import { UserError } from "./lib/errors";
 
 type Command = { run: (argv: string[]) => void | Promise<void> };
@@ -14,6 +17,9 @@ const registry: Record<string, Command> = {
   show,
   list,
   search,
+  update,
+  close,
+  dep,
 };
 
 const HELP = `slip — git-native issue tracker for agents
