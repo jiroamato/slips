@@ -145,6 +145,22 @@ slips/
 
 The repo also gets `.mulch/` (via `ml init`) as its memory system, and is published public on GitHub via `gh repo create`.
 
+## Git Workflow
+
+**Branching:** `main` (releases only) and `dev` (integration). Feature branches cut from `dev`, named after conventional-commit types: `feat/…`, `fix/…`, `chore/…`, `docs/…`. Hotfixes: `hotfix/…` off `main`, PR to `main`, then back-merge `main` → `dev`.
+
+**Merging:**
+- Feature → dev: **squash and merge**. The PR title becomes the commit message, so PR titles must be conventional; enforced in CI by `amannn/action-semantic-pull-request`.
+- Dev → main (release PRs): **merge commit** — never squash, so per-feature conventional commits reach `main` intact for changelog generation and `main`/`dev` stay aligned.
+
+**Commits:** Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`; `!` or `BREAKING CHANGE:` for majors). Semver derives from them: `fix` → patch, `feat` → minor, breaking → major.
+
+**Releases:** `release-please` GitHub Action watches `main`, maintains a running release PR with the version bump and generated `CHANGELOG.md`, and tags on merge.
+
+**CI (GitHub Actions):** on every PR — `bun test`, Biome check, `tsc --noEmit`, PR title lint.
+
+**Branch protection:** `main` and `dev` accept PRs only (no direct pushes, no force pushes), required status checks: test, lint, typecheck.
+
 ## Error Handling
 
 - All user-facing failures print one clear line to stderr (or `{"error"}` with `--json`) and exit 1.
