@@ -1,9 +1,12 @@
 #!/usr/bin/env bun
+import * as claim from "./commands/claim";
 import * as close from "./commands/close";
 import * as create from "./commands/create";
 import * as dep from "./commands/dep";
 import * as init from "./commands/init";
 import * as list from "./commands/list";
+import * as ready from "./commands/ready";
+import * as release from "./commands/release";
 import * as search from "./commands/search";
 import * as show from "./commands/show";
 import * as update from "./commands/update";
@@ -20,6 +23,9 @@ const registry: Record<string, Command> = {
   update,
   close,
   dep,
+  claim,
+  release,
+  ready,
 };
 
 const HELP = `slip — git-native issue tracker for agents

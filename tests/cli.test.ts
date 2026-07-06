@@ -135,6 +135,7 @@ test("close sets closed_at, reason, clears claim", () => {
   const repo = makeRepo();
   runSlip(repo, "init");
   const id = runSlip(repo, "create", "--title", "To close").out.trim();
+  runSlip(repo, "claim", id, "--agent", "tester");
   const r = runSlip(repo, "close", id, "--reason", "fixed");
   expect(r.code).toBe(0);
   const s = JSON.parse(runSlip(repo, "show", id, "--json").out);
@@ -197,4 +198,51 @@ test("dep add/rm with cycle and unknown-id rejection", () => {
   expect(runSlip(repo, "dep", "rm", a, b).code).toBe(0);
   const s = JSON.parse(runSlip(repo, "show", a, "--json").out);
   expect(s.blocked_by).toEqual([]);
+});
+
+test("claim takes a lease, blocks rivals, allows self-refresh", () => {
+  const repo = makeRepo();
+  runSlip(repo, "init");
+  const id = runSlip(repo, "create", "--title", "Contended").out.trim();
+  expect(runSlip(repo, "claim", id, "--agent", "alice", "--session", "s1").code).toBe(0);
+  const s = JSON.parse(runSlip(repo, "show", id, "--json").out);
+  expect(s.status).toBe("in_progress");
+  expect(s.claim.agent).toBe("alice");
+  const rival = runSlip(repo, "claim", id, "--agent", "bob");
+  expect(rival.code).toBe(1);
+  expect(rival.err).toContain("alice");
+  expect(runSlip(repo, "claim", id, "--agent", "alice", "--ttl", "2h").code).toBe(0); // refresh
+  runSlip(repo, "close", id);
+  expect(runSlip(repo, "claim", id, "--agent", "bob").code).toBe(1); // closed slips unclaimable
+});
+
+test("release by id and by session reopens slips", () => {
+  const repo = makeRepo();
+  runSlip(repo, "init");
+  const a = runSlip(repo, "create", "--title", "A").out.trim();
+  const b = runSlip(repo, "create", "--title", "B").out.trim();
+  runSlip(repo, "claim", a, "--agent", "alice", "--session", "s1");
+  runSlip(repo, "claim", b, "--agent", "alice", "--session", "s1");
+  runSlip(repo, "release", a);
+  let s = JSON.parse(runSlip(repo, "show", a, "--json").out);
+  expect(s.status).toBe("open");
+  expect(s.claim).toBeNull();
+  runSlip(repo, "release", "--session", "s1");
+  s = JSON.parse(runSlip(repo, "show", b, "--json").out);
+  expect(s.claim).toBeNull();
+});
+
+test("ready lists open unblocked unclaimed work in priority order", () => {
+  const repo = makeRepo();
+  runSlip(repo, "init");
+  const low = runSlip(repo, "create", "--title", "Low", "--priority", "3").out.trim();
+  const high = runSlip(repo, "create", "--title", "High", "--priority", "0").out.trim();
+  const blocked = runSlip(repo, "create", "--title", "Blocked", "--blocked-by", high).out.trim();
+  const claimed = runSlip(repo, "create", "--title", "Claimed").out.trim();
+  runSlip(repo, "claim", claimed, "--agent", "x");
+  const ready = JSON.parse(runSlip(repo, "ready", "--json").out);
+  expect(ready.map((s: { id: string }) => s.id)).toEqual([high, low]);
+  runSlip(repo, "close", high);
+  const after = JSON.parse(runSlip(repo, "ready", "--json").out);
+  expect(after.map((s: { id: string }) => s.id)).toContain(blocked);
 });
