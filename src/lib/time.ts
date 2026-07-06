@@ -10,7 +10,10 @@ export function nowIso(now: Date = new Date()): string {
 export function parseTtl(input: string): number {
   const m = /^(\d+)([smhd])$/.exec(input.trim());
   if (!m) throw new UserError(`invalid duration "${input}" — use forms like 30s, 45m, 2h, 1d`);
-  return Number(m[1]) * UNITS[m[2] as keyof typeof UNITS];
+  const factor = UNITS[m[2] ?? ""];
+  if (factor === undefined)
+    throw new UserError(`invalid duration "${input}" — use forms like 30s, 45m, 2h, 1d`);
+  return Number(m[1]) * factor;
 }
 
 export function isExpired(expiresAt: string, now: Date = new Date()): boolean {
