@@ -18,7 +18,7 @@ jobs:
           bun-version: latest
       - run: bun install --frozen-lockfile
       - run: bun test --reporter=junit --reporter-outfile=junit.xml --coverage --coverage-reporter=lcov
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: test-results-${{ matrix.os }}
